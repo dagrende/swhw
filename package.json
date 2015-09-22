@@ -1,0 +1,37 @@
+{
+  "name": "swhw",
+  "version": "1.0.0",
+  "description": "Architecture Visualizer",
+  "main": "index.html",
+  "config" : {
+    "port" : "9090"
+  },
+  "scripts": {
+    "serve": "http-server -c-1 -p $npm_package_config_port app/",
+    "open": "opener http://localhost:$npm_package_config_port",
+    "build": "mkdir -p app/.tmp && browserify -d app/js/main.js -o app/.tmp/bundle.js && cp node_modules/webcola/WebCola/cola.js app/.tmp",
+    "watch": "nodemon -q -w app/ --ext '.' --exec 'npm run build' -i app/.tmp",
+    "live-reload": "export liveport=$((npm_package_config_port + 1)) && sed -i -e \"1,\\$s#localhost:.*/livereload#localhost:${liveport}/livereload#\" app/index.html && live-reload --port $liveport app/.tmp",
+    "dev": "npm run open -s & parallelshell \"npm run live-reload -s\" \"npm run serve -s\" \"npm run watch\""
+  },
+  "author": "dag.rende@find-out.se",
+  "license": "ISC",
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:FindOut/swhw.git"
+  },
+  "devDependencies": {
+    "browserify": "^11.0.0",
+    "http-server": "^0.8.0",
+    "live-reload": "^1.1.0",
+    "nodemon": "^1.3.8",
+    "opener": "^1.4.1",
+    "parallelshell": "^1.2.0"
+  },
+  "dependencies": {
+    "d3": "^3.5.6",
+    "jquery": "^2.1.4",
+    "lodash": "^3.10.0",
+    "webcola": "git://github.com/tgdwyer/WebCola.git#master"
+  }
+}

@@ -1,0 +1,4 @@
+node_modules
+app/.tmp
+app/index.html-*
+app/groups

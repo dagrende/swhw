@@ -1,0 +1,25 @@
+{
+  "renderer": "swhw",
+  "objs": [
+    {"id": "cms1", "type": "ecu", "title": "CMS1/E113"},
+    {"id": "appl", "type": "layer", "container": "cms1", "title": "appl"},
+    {"id": "fuel", "type": "swcomp", "container": "appl", "title": "fuel"},
+    {"id": "xpin_anin_pin_b08_e", "type": "xpin", "container": "cms1", "title": "xpin_anin_pin_b08_e"},
+    {"id": "rtdb_fuel_level_e", "type": "rtdbsig", "container": "cms1", "title": "rtdb_fuel_level_e"},
+    {"id": "rtdb_fuel_level_tot_e", "type": "rtdbsig", "container": "cms1", "title": "rtdb_fuel_level_tot_e"},
+    {"id": "rtdb_fuel_volume_e", "type": "rtdbsig", "container": "cms1", "title": "rtdb_fuel_volume_e"},
+    {"id": "rtdb_fuel_consumption_rate_e", "type": "rtdbsig", "container": "cms1", "title": "rtdb_fuel_consumption_rate_e"},
+    {"id": "rtdb_low_fuel_level_ind_e", "type": "rtdbsig", "container": "cms1", "title": "rtdb_low_fuel_level_ind_e"},
+    {"id": "rtdb_pbrake_applied_high_e", "type": "rtdbsig", "container": "cms1", "title": "rtdb_pbrake_applied_high_e"},
+    {"id": "HiResVehicleDist", "type": "canmsg", "title": "HiResVehicleDist"},
+
+    {"id": "1", "type": "grayarrow", "from": "rtdb_fuel_consumption_rate_e", "to": "fuel"},
+    {"id": "2", "type": "grayarrow", "from": "xpin_anin_pin_b08_e", "to": "rtdb_fuel_level_e"},
+    {"id": "3", "type": "grayarrow", "from": "rtdb_pbrake_applied_high_e", "to": "fuel"},
+    {"id": "4", "type": "blackarrow", "from": "fuel", "to": "rtdb_low_fuel_level_ind_e"},
+    {"id": "5", "type": "blackwhitearrow", "from": "rtdb_fuel_volume_e", "to": "fuel"},
+    {"id": "6", "type": "blackwhitearrow", "from": "rtdb_fuel_level_e", "to": "fuel"},
+    {"id": "7", "type": "blackwhitearrow", "from": "rtdb_fuel_level_tot_e", "to": "fuel"},
+    {"id": "8", "type": "partof", "from": "HiResVehicleDist", "to": "cms1"}
+  ]
+}
