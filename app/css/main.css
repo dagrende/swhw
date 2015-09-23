@@ -23,15 +23,15 @@ svg text {
 }
 
 .link {
-  stroke: #7a4e4e;
-  stroke-width: 3px;
+  stroke: black;
+  stroke-width: 1px;
   stroke-opacity: 1;
 }
 
 .label {
     fill: white;
     font-family: Verdana;
-    font-size: 25px;
+    font-size: 10px;
     text-anchor: middle;
     cursor: move;
 }

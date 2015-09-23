@@ -4,123 +4,16 @@ var _ = require('lodash');
 
 var nodeWidth = 41;
 var nodeHeight = 15;
-
-function Bounds() {
-  var listeners = [];
-  return {
-    min: {x: 0, y: 0},
-    max: {x: 0, y: 0},
-    onChange: function(listener) {listeners.push(listener);},
-    fireChange: function() {_.each(listeners, function(listener) {listener(this)}.bind(this))},
-    updateBounds: function(objs) {
-      this.min.x = this.max.x = objs.length ? objs[0].x : 0;
-      this.min.y = this.max.y = objs.length ? objs[0].y : 0;
-      _.each(objs, function(obj, i) {
-        this.min.x = Math.min(this.min.x, obj.x);
-        this.min.y = Math.min(this.min.y, obj.y);
-        this.max.x = Math.max(this.max.x, obj.x + (obj.width || 0));
-        this.max.y = Math.max(this.max.y, obj.y + (obj.height || 0));
-      }.bind(this));
-      this.fireChange();
-    }
-  };
-}
-
-function SimpleLayoutExtension(parent, objects, rels, nodeById, bounds) {
-  console.log('objects',objects,'rels',rels);
-  var classification = {
-    ecu: {id: 'id', isRelation: false, title: 'id'},
-    layer: {id: 'id', isRelation: false, title: 'id'},
-    swcomp: {id: 'id', isRelation: false, title: 'id'},
-    xpin: {id: 'id', isRelation: false, title: 'id'},
-    rtdbsig: {id: 'id', isRelation: false, title: 'id'},
-    canmsg: {id: 'id', isRelation: false, title: 'id'},
-
-    grayarrow: {id: 'id', isRelation: true, source: 'from', target: 'to', title: 'id'},
-    blackarrow: {id: 'id', isRelation: true, source: 'from', target: 'to', title: 'id'},
-    blackwhitearrow: {id: 'id', isRelation: true, source: 'from', target: 'to', title: 'id'},
-    partof: {id: 'id', isRelation: true, source: 'parent', target: 'child', title: 'id'}
-  };
-
-  var nodes = [], groups = [];
-  _.each(objects, function(obj) {
-    if (obj.container) {
-//      nodeById[obj.container].isGroup = true;
-    }
-  });
-  _.each(objects, function(obj) {
-    if (obj.isGroup) {
-      groups.push(obj);
-    } else {
-      nodes.push(obj);
-    }
-  });
-  _.each(objects, function(obj) {
-    if (obj.container) {
-      var container = nodeById[obj.container];
-      if (obj.isGroup) {
-        container.groups = container.groups || [];
-        container.groups.push(groups.indexOf(obj))
-      } else {
-        container.leaves = container.leaves || [];
-        container.leaves.push(nodes.indexOf(obj))
-      }
-    }
-  });
-  console.log('nodes',nodes,'groups',groups);
-  groups.forEach(function (g) { g.padding = 0.01; });
-
-  _.each(rels, function(rel) {
-    rel.source = nodeById[rel[classification[rel.type].source]];
-    rel.target = nodeById[rel[classification[rel.type].target]];
-  });
-
-  var force = cola.d3adaptor()
-    .linkDistance(150)
-    .nodes(nodes)
-    .links(rels || _.slice([]))
-    .groups(groups)
-    .avoidOverlaps(true)
-    .start(10,15,20);
-
-  d3.selectAll('.node').call(force.drag);
-
-  force.on('tick', function() {
-    parent.selectAll('.relation').each(function(d) {
-      d3.select(this)
-        .attr('x1', function(d) {return d.source.x + d.source.width / 2;})
-        .attr('y1', function(d) {return d.source.y + d.source.height / 2;})
-        .attr('x2', function(d) {return d.target.x + d.target.width / 2;})
-        .attr('y2', function(d) {return d.target.y + d.target.height / 2;});
-    });
-
-    parent.selectAll('.node')
-        .each(function(d) {
-          var item = d3.select(this);
-          if (d.isGroup) {
-            item
-                .attr('transform', function(d) {return 'translate(' + d.bounds.x + ',' + d.bounds.y + ')';})
-                .select('.noderect')
-                .attr('width', function(d) {return d.bounds.width();})
-                .attr('height', function(d) {return d.bounds.height();});
-          } else {
-            item.attr('transform', function(d) {return 'translate(' + d.x + ',' + d.y + ')';})
-          }
-        });
-    bounds.updateBounds(nodes);
-  });
-}
-
 var rtdbsigRadius = 12;
 
 function getNodesLinksGroups(objs) {
   var typeClass = {
     ecu: 'node', layer: 'node', xpin: 'node', swcomp: 'node', rtdbsig: 'node', canmsg: 'node',
-    grayarrow: 'link', blackarrow: 'link', blackwhitearrow: 'link'
+    grayarrow: 'link', blackarrow: 'link', blackwhitearrow: 'link', partof: 'link'
    };
   var nodeIndexById = {};
   var groupIndexById = {};
-  var nodes = [], links = [], groups = [];
+  var nodes = [], groups = [], links = [], otherLinks = [];
 
   // make index of all nodes and groups
   var objById = _.indexBy(objs, 'id');
@@ -165,17 +58,27 @@ function getNodesLinksGroups(objs) {
   // collect all links and set source, target to node indices
   _.each(objs, function(obj) {
     if (typeClass[obj.type] === 'link') {
-      var source = objById[obj.from];
-      var target = objById[obj.to];
-      if (source && target) {
+      var source = nodeIndexById[obj.from];
+      var target = nodeIndexById[obj.to];
+      if (source !== undefined && target !== undefined) {
         obj.source = source;
         obj.target = target;
         links.push(obj);
+      } else {
+        var objSource = objById[obj.from];
+        var objTarget = objById[obj.to];
+        if (objSource && objTarget) {
+          obj.source = objSource;
+          obj.target = objTarget;
+          otherLinks.push(obj);
+        }
       }
+
+
     }
   });
 
-  return {nodes: nodes, links: links, groups: groups};
+  return {nodes: nodes, groups: groups, links: links, otherLinks: otherLinks};
 }
 
 function GroupsRenderer(extensions) {
@@ -187,8 +90,8 @@ function GroupsRenderer(extensions) {
     // renders objects in parent
     // returns outer bounds {min: {x: , y: }, max: {x: , y: }} of all objects together after rendering
     render: function(parent, objects) {
-      var width = 300,
-          height = 300;
+      var width = 900,
+          height = 600;
 
       var color = d3.scale.category20();
 
@@ -215,9 +118,10 @@ function GroupsRenderer(extensions) {
           .style("fill", function (d, i) { return color(i); });
 
       var link = parent.selectAll(".link")
-          .data(graph.links)
+          .data(graph.links.concat(graph.otherLinks))
         .enter().append("line")
-          .attr("class", "link");
+          .attr("class", "link")
+          .attr('marker-end', 'url(#markerArrowEndBlack)');
 
       var pad = 3;
       var node = parent.selectAll(".node")
@@ -234,32 +138,67 @@ function GroupsRenderer(extensions) {
           .data(graph.nodes)
          .enter().append("text")
           .attr("class", "label")
-          .text(function (d) { return d.name; })
+          .text(function (d) { return d.id; })
           .call(force.drag);
 
       node.append("title")
           .text(function (d) { return d.name; });
 
       force.on("tick", function () {
-          link.attr("x1", function (d) { return d.source.x; })
-              .attr("y1", function (d) { return d.source.y; })
-              .attr("x2", function (d) { return d.target.x; })
-              .attr("y2", function (d) { return d.target.y; });
 
-          node.attr("x", function (d) { return d.x - d.width / 2 + pad; })
-              .attr("y", function (d) { return d.y - d.height / 2 + pad; });
+        parent.selectAll(".link")
+          .each(function(d) {
+            var p1 = {
+              x: d.source.x || (d.source.bounds.x + d.source.bounds.X) / 2,
+              y: d.source.y || (d.source.bounds.y + d.source.bounds.Y) / 2
+            };
+            var s1 = {
+              width: d.source.width || (d.source.bounds.X - d.source.bounds.x),
+              height: d.source.height || (d.source.bounds.Y - d.source.bounds.y)
+            };
+            var r1 = {
+              x: p1.x - s1.width / 2,
+              y: p1.y - s1.height / 2,
+              width: s1.width,
+              height: s1.height
+            };
+            var p2 = {
+              x: d.target.x || (d.target.bounds.x + d.target.bounds.X) / 2,
+              y: d.target.y || (d.target.bounds.y + d.target.bounds.Y) / 2
+            };
+            var s2 = {
+              width: d.target.width || (d.target.bounds.X - d.target.bounds.x),
+              height: d.target.height || (d.target.bounds.Y - d.target.bounds.y)
+            };
+            var r2 = {
+              x: p2.x - s2.width / 2,
+              y: p2.y - s2.height / 2,
+              width: s2.width,
+              height: s2.height
+            };
+            adjustToRectEdge(p1, p2, r2);
+            adjustToRectEdge(p2, p1, r1);
+            d3.select(this)
+                .attr("x1",  p1.x)
+                .attr("y1", p1.y)
+                .attr("x2", p2.x)
+                .attr("y2", p2.y);
+        });
 
-          group.attr("x", function (d) { return d.bounds.x; })
-               .attr("y", function (d) { return d.bounds.y; })
-              .attr("width", function (d) { return d.bounds.width(); })
-              .attr("height", function (d) { return d.bounds.height(); });
+        parent.selectAll(".node").attr("x", function (d) { return d.x - d.width / 2 + pad; })
+            .attr("y", function (d) { return d.y - d.height / 2 + pad; });
 
-          label.attr("x", function (d) { return d.x; })
-               .attr("y", function (d) {
-                   var h = this.getBBox().height;
-                   return d.y + h/4;
-               });
-          bounds.updateBounds(graph.nodes);
+        parent.selectAll(".group").attr("x", function (d) { return d.bounds.x; })
+             .attr("y", function (d) { return d.bounds.y; })
+            .attr("width", function (d) { return d.bounds.width(); })
+            .attr("height", function (d) { return d.bounds.height(); });
+
+        parent.selectAll(".label").attr("x", function (d) { return d.x; })
+             .attr("y", function (d) {
+                 var h = this.getBBox().height;
+                 return d.y + h/4;
+             });
+        bounds.updateBoundsCentered(graph.nodes);
       });
     return bounds;
   }
@@ -437,6 +376,166 @@ return {
   };
 }
 
+function SimpleLayoutExtension(parent, objects, rels, nodeById, bounds) {
+  console.log('objects',objects,'rels',rels);
+  var classification = {
+    ecu: {id: 'id', isRelation: false, title: 'id'},
+    layer: {id: 'id', isRelation: false, title: 'id'},
+    swcomp: {id: 'id', isRelation: false, title: 'id'},
+    xpin: {id: 'id', isRelation: false, title: 'id'},
+    rtdbsig: {id: 'id', isRelation: false, title: 'id'},
+    canmsg: {id: 'id', isRelation: false, title: 'id'},
+
+    grayarrow: {id: 'id', isRelation: true, source: 'from', target: 'to', title: 'id'},
+    blackarrow: {id: 'id', isRelation: true, source: 'from', target: 'to', title: 'id'},
+    blackwhitearrow: {id: 'id', isRelation: true, source: 'from', target: 'to', title: 'id'},
+    partof: {id: 'id', isRelation: true, source: 'parent', target: 'child', title: 'id'}
+  };
+
+  var nodes = [], groups = [];
+  _.each(objects, function(obj) {
+    if (obj.container) {
+//      nodeById[obj.container].isGroup = true;
+    }
+  });
+  _.each(objects, function(obj) {
+    if (obj.isGroup) {
+      groups.push(obj);
+    } else {
+      nodes.push(obj);
+    }
+  });
+  _.each(objects, function(obj) {
+    if (obj.container) {
+      var container = nodeById[obj.container];
+      if (obj.isGroup) {
+        container.groups = container.groups || [];
+        container.groups.push(groups.indexOf(obj))
+      } else {
+        container.leaves = container.leaves || [];
+        container.leaves.push(nodes.indexOf(obj))
+      }
+    }
+  });
+  console.log('nodes',nodes,'groups',groups);
+  groups.forEach(function (g) { g.padding = 0.01; });
+
+  _.each(rels, function(rel) {
+    rel.source = nodeById[rel[classification[rel.type].source]];
+    rel.target = nodeById[rel[classification[rel.type].target]];
+  });
+
+  var force = cola.d3adaptor()
+    .linkDistance(150)
+    .nodes(nodes)
+    .links(rels || _.slice([]))
+    .groups(groups)
+    .avoidOverlaps(true)
+    .start(10,15,20);
+
+  d3.selectAll('.node').call(force.drag);
+
+  force.on('tick', function() {
+    parent.selectAll('.relation').each(function(d) {
+      d3.select(this)
+        .attr('x1', function(d) {return d.source.x + d.source.width / 2;})
+        .attr('y1', function(d) {return d.source.y + d.source.height / 2;})
+        .attr('x2', function(d) {return d.target.x + d.target.width / 2;})
+        .attr('y2', function(d) {return d.target.y + d.target.height / 2;});
+    });
+
+    parent.selectAll('.node')
+        .each(function(d) {
+          var item = d3.select(this);
+          if (d.isGroup) {
+            item
+                .attr('transform', function(d) {return 'translate(' + d.bounds.x + ',' + d.bounds.y + ')';})
+                .select('.noderect')
+                .attr('width', function(d) {return d.bounds.width();})
+                .attr('height', function(d) {return d.bounds.height();});
+          } else {
+            item.attr('transform', function(d) {return 'translate(' + d.x + ',' + d.y + ')';})
+          }
+        });
+    bounds.updateBounds(nodes);
+  });
+}
+
+function Bounds() {
+  var listeners = [];
+  return {
+    min: {x: 0, y: 0},
+    max: {x: 0, y: 0},
+    onChange: function(listener) {listeners.push(listener);},
+    fireChange: function() {_.each(listeners, function(listener) {listener(this)}.bind(this))},
+    // update bounds with rectangles that have x,y in top left corner
+    updateBounds: function(objs) {
+      this.min.x = this.max.x = objs.length ? objs[0].x : 0;
+      this.min.y = this.max.y = objs.length ? objs[0].y : 0;
+      _.each(objs, function(obj, i) {
+        this.min.x = Math.min(this.min.x, obj.x);
+        this.min.y = Math.min(this.min.y, obj.y);
+        this.max.x = Math.max(this.max.x, obj.x + (obj.width || 0));
+        this.max.y = Math.max(this.max.y, obj.y + (obj.height || 0));
+      }.bind(this));
+      this.fireChange();
+    },
+    // update bounds with rects that are centered around x,y
+    updateBoundsCentered: function(objs) {
+      this.min.x = this.max.x = objs.length ? objs[0].x - objs[0].width / 2 : 0;
+      this.min.y = this.max.y = objs.length ? objs[0].y - objs[0].height / 2 : 0;
+      _.each(objs, function(obj, i) {
+        this.min.x = Math.min(this.min.x, obj.x - (obj.width || 0) / 2);
+        this.min.y = Math.min(this.min.y, obj.y - (obj.height || 0) / 2);
+        this.max.x = Math.max(this.max.x, obj.x + (obj.width || 0) / 2);
+        this.max.y = Math.max(this.max.y, obj.y + (obj.height || 0) / 2);
+      }.bind(this));
+      this.fireChange();
+    }
+  };
+}
+
+// sets result.x/.y to the crossing of two lines defined by points 1-2 and 3-4
+function lineCrossing(result, x1, y1, x2, y2, x3, y3, x4, y4) {
+  var px = ((x1*y2-y1*x2)*(x3-x4)-(x1-x2)*(x3*y4-y3*x4))/((x1-x2)*(y3-y4)-((y1-y2)*(x3-x4)));
+  var py = ((x1*y2-y1*x2)*(y3-y4)-(y1-y2)*(x3*y4-y3*x4))/((x1-x2)*(y3-y4)-((y1-y2)*(x3-x4)));
+  result.x = px;
+  result.y = py;
+}
+
+// change point rp so that line p-rp stops at the edge of rect r
+// p, rp have x, y
+// r has x, y, width, height
+function adjustToRectEdge(p, rp, r) {
+  var x3, y3, x4, y4;
+  var dx = rp.x - p.x;
+  var dy = rp.y - p.y;
+  var k = dx == 0 ? 1000000 : dy / dx;
+  var rk = r.height / r.width;
+  x3 = r.x;
+  y3 = r.y;
+  if (Math.abs(k) < Math.abs(rk)) {
+    // line crosses left or right rect edge
+    x4 = r.x;
+    y4 = r.y + r.height;
+    if (dx < 0) {
+      // line crosses right edge
+      x3 += r.width;
+      x4 += r.width;
+    }
+  } else {
+    // line crosses top or bottom rect edge
+    x4 = r.x + r.width;
+    y4 = r.y;
+    if (dy < 0) {
+      // line crosses bottom edge
+      y3 += r.height;
+      y4 += r.height;
+    }
+  }
+  lineCrossing(rp, p.x, p.y, rp.x, rp.y, x3, y3, x4, y4);
+}
+
 // use var v = new ModelViewer(site); to create
 // an svg element the model in the site element (a d3 selection)
 // and render it with v();
@@ -451,7 +550,26 @@ function ModelViewer(site) {
     if (objects) {
       var svg = site.selectAll('svg')
         .data([1]);
-      svg.enter().append('svg');
+      var svgEnter = svg.enter().append('svg');
+
+      var defs = svgEnter.append('defs');
+      var markerData = [
+        {name: 'markerArrowEndBlack', refX: 10, pathd: 'M0,-5 L10,0 L0,5 z', color: 'black'}
+      ];
+      defs.selectAll('marker')
+        .data(markerData).enter().append('marker')
+        .attr('id', function(d) {return d.name})
+        .attr('viewBox', '0 -5 10 10')
+        .attr('refX', function(d) {return d.refX})
+        .attr('refY', 0)
+        .attr('markerWidth', 6)
+        .attr('markerHeight', 6)
+        .attr('orient', 'auto')
+        .attr('fill', function(d) {return d.color})
+        .attr('stroke', function(d) {return d.color})
+        .append('path')
+          .attr('d', function(d) {return d.pathd});
+
 
       var renderer = renderers[objects.renderer];
       renderer.bounds.onChange(function(bounds) {
